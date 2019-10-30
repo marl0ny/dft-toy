@@ -1,6 +1,6 @@
 # Exploring the Discrete Fourier Transfrom Using Numpy, Sympy, Matplotlib, and Tkinter
 
-<img src="https://raw.githubusercontent.com/marl0ny/dft-toy/master/screenshot.png" />
+<img src="https://raw.githubusercontent.com/marl0ny/dft-toy/master/screenshot.jpg" />
 
 To run this program, first ensure that `python3` with the modules `tkinter`, `numpy`, `sympy`, and `matplotlib` 
 are installed on your computer. The first of these comes with Python. The other three can be installed with
