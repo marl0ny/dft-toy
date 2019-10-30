@@ -1,4 +1,4 @@
-# Exploring the Discrete Fourier Transfrom Using Numpy, Sympy, Matplotlib, and Tkinter
+# Exploring the Discrete Fourier Transform Using Numpy, Sympy, Matplotlib, and Tkinter
 
 <img src="https://raw.githubusercontent.com/marl0ny/dft-toy/master/screenshot.jpg" />
 
