@@ -5,8 +5,39 @@ from animation import Animation
 import tkinter as tk
 import numpy as np
 from matplotlib.backends import backend_tkagg
-from functions import Functionx
+from functions import Functionx, multiplies_var
 import matplotlib.pyplot as plt
+from terminal_print import print_to_terminal
+from locate_mouse import in_bounds, locate_mouse
+
+
+def change_array(x_arr: np.ndarray, y_arr: np.ndarray,
+                 x: float, y: float) -> np.ndarray:
+    """
+    Given a location x that maps to a value y,
+    and an array x_arr which maps to array y_arr, find the closest
+    element in x_arr to x. Then, change its corresponding
+    element in y_arr with y.
+    """
+
+    if (x < x_arr[0]) or (x > x_arr[-1]):
+        return y_arr
+    # if (y < y_arr[0]) or (y > y_arr[-1]):
+    #     return y_arr
+
+    closest_index = np.argmin(np.abs(x_arr - x))
+    y_arr[closest_index] = y
+
+    # If len(x) is large, change nearby values as well.
+    if (len(x_arr) > 100):
+        try:
+            for i in range(3):
+                y_arr[closest_index + i] = y
+                y_arr[closest_index - i] = y
+        except IndexError:
+            pass
+
+    return y_arr
 
 
 class Main(Animation):
@@ -26,7 +57,8 @@ class Main(Animation):
         self.f = Functionx("(a/(sqrt(2*pi*sigma**2)))*"
                            "exp(-(1/2)*((x - mu)/sigma)**2)")
         self.x = np.linspace(-np.pi, np.pi, 512)
-        line, = self.ax[0].plot(self.x, self.f(self.x, 1, 1, 1))
+        self.y = self.f(self.x, 1, 1, 1)
+        line, = self.ax[0].plot(self.x, self.y)
         f = np.fft.fftshift(np.fft.fft(self.f(self.x, 1, 1, 1)))/len(self.x)
         dx = self.x[1] - self.x[0]
         freq = 2*np.pi*np.fft.fftshift(np.fft.fftfreq(len(self.x), d=dx))
@@ -108,6 +140,8 @@ class Main(Animation):
             rowspan=19,
             columnspan=2
             )
+        self.canvas.get_tk_widget().bind("<B1-Motion>",
+                                         self.update_function_by_mouse)
 
         # All the other widgets
         self.enterfunctionlabel = tk.Label(self.window,
@@ -147,7 +181,11 @@ class Main(Animation):
             "Sinc Function": "a*sinc(20*k*(x - phi))",
             "Rectangle Function": "a*rect(k*(x - b))",
             "Wavepacket": "a*sin(50*k*(x - phi))*exp(-(x-b)**2/"
-            "(2*sigma**2 ))/sqrt(2*pi*sigma**2)"
+            "(2*sigma**2 ))/sqrt(2*pi*sigma**2)",
+            "Noise": "a*noise(k*(x - b))",
+            "Two Gaussians": "a*exp(-0.5*(x-c)**2/sigma_1**2)"
+            "/sqrt(2*pi*sigma_1**2) + "
+            "b*exp(-0.5*(x+d)**2/sigma_2**2)/sqrt(2*pi*sigma_2**2)" 
             }
         self.function_menu_string = tk.StringVar(self.window)
         self.function_menu_string.set("Preset function f(x)")
@@ -177,6 +215,17 @@ class Main(Animation):
         plt.draw()
         self.ax[1].set_ylim(ymin, ymax)
 
+    def _update_appearance(self) -> None:
+        """
+        Helper function that updates the appearance of the function.
+        """
+        self.line.set_ydata(self.y)
+        self.fourier_amps = np.fft.fftshift(
+                np.fft.fft(self.y)/len(self.x))
+        self.line2.set_ydata(np.real(self.fourier_amps))
+        self.line3.set_ydata(np.imag(self.fourier_amps))
+        self.line4.set_ydata(np.abs(self.fourier_amps))
+
     def _update_function(self, str_args: str) -> None:
         """
         Helper function for update_function_by_entry and
@@ -184,12 +233,8 @@ class Main(Animation):
         """
         self.f = Functionx(str_args)
         ones = ([1 for i in range(len(self.f.symbols) - 1)])
-        self.line.set_ydata(self.f(self.x, *ones))
-        self.fourier_amps = np.fft.fftshift(
-                np.fft.fft(self.f(self.x, *ones)))/len(self.x)
-        self.line2.set_ydata(np.real(self.fourier_amps))
-        self.line3.set_ydata(np.imag(self.fourier_amps))
-        self.line4.set_ydata(np.abs(self.fourier_amps))
+        self.y = self.f(self.x, *ones)
+        self._update_appearance()
         self.text.set_text("f(x) = $%s$" % (self.f.latex_repr))
         self.set_sliders()
         # self.lim_update()
@@ -215,12 +260,36 @@ class Main(Animation):
         tmplist = []
         for i in range(len(self.sliderslist)):
             tmplist.append(self.sliderslist[i].get())
-        self.line.set_ydata(self.f(self.x, *tmplist))
-        self.fourier_amps = np.fft.fftshift(
-                np.fft.fft(self.f(self.x, *tmplist)))/len(self.x)
-        self.line2.set_ydata(np.real(self.fourier_amps))
-        self.line3.set_ydata(np.imag(self.fourier_amps))
-        self.line4.set_ydata(np.abs(self.fourier_amps))
+        self.y = self.f(self.x, *tmplist)
+        self._update_appearance()
+
+    def update_function_by_mouse(self, event: tk.Event) -> None:
+        """
+        Update the function by mouse.
+        """
+        bounds = list(self.ax[0].get_xlim())
+        bounds.extend(self.ax[0].get_ylim())
+        pixel_bounds = [120, 430, 494, 530, 865, 632]
+        bounds_ft = list(self.ax[1].get_xlim())
+        bounds_ft.extend(self.ax[1].get_ylim())
+        pixel_ft_bounds = [120, 78, 493, 180, 863, 279] 
+        height = self.canvas.get_tk_widget().winfo_height()
+        if in_bounds(event, pixel_bounds, height):
+            x, y = locate_mouse(event, bounds, height, pixel_bounds)
+            change_array(self.x, self.y, x, y)
+            self._update_appearance()
+        elif in_bounds(event, pixel_ft_bounds, height):
+            x, y = locate_mouse(event, bounds_ft, height, pixel_ft_bounds)
+            change_array(self.freq, self.fourier_amps, x, y)
+            change_array(self.freq, self.fourier_amps, -x, y)
+            # change_array(self.freq, self.fourier_amps, x, y*np.exp(x*1.0j))
+            # change_array(self.freq, self.fourier_amps, -x, y*np.exp(-x*1.0j))
+            self.line2.set_ydata(np.real(self.fourier_amps))
+            self.line3.set_ydata(np.imag(self.fourier_amps))
+            self.line4.set_ydata(np.abs(self.fourier_amps))
+            self.y = np.fft.ifft(
+                    np.fft.ifftshift(self.fourier_amps))*len(self.x)
+            self.line.set_ydata(np.real(self.y))
 
     def set_sliders(self) -> None:
         """
@@ -230,6 +299,7 @@ class Main(Animation):
         for slider in self.sliderslist:
             slider.destroy()
         self.sliderslist = []
+        default_vals = self.f.get_default_values()
         for i, symbol in enumerate(self.f.parameters):
             self.sliderslist.append(tk.Scale(self.window,
                                              label="change "
@@ -241,9 +311,10 @@ class Main(Animation):
                                              command=self.slider_update))
             self.sliderslist[i].grid(row=i + 4, column=3,
                                      padx=(10, 10), pady=(0, 0))
-            self.sliderslist[i].set(1.0)
+            self.sliderslist[i].set(default_vals[symbol])
 
     def update(self, delta_t: float) -> None:
+        # print_to_terminal("fps: %d" % (int(1.0/delta_t)))
         pass
 
 
