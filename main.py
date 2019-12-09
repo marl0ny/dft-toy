@@ -29,14 +29,15 @@ def change_array(x_arr: np.ndarray, y_arr: np.ndarray,
     y_arr[closest_index] = y
 
     # If len(x) is large, change nearby values as well.
+    """
     if (len(x_arr) > 100):
         try:
-            for i in range(3):
+            for i in range():
                 y_arr[closest_index + i] = y
                 y_arr[closest_index - i] = y
         except IndexError:
             pass
-
+    """
     return y_arr
 
 
@@ -92,7 +93,7 @@ class Main(Animation):
         s = (-xbounds[0] + xbounds[1])/50 + xbounds[0]
         y = (ybounds[1] - ybounds[0])*0.8 + ybounds[0]
         # y = 100
-        self.text = self.ax[0].text(s, y, r"f(x) = $%s$" % (self.f.latex_repr))
+        self.text = self.ax[0].text(s, y, r"f(x) = $%s$" % self.f.latex_repr)
         self.text.set_bbox({"facecolor": "white", "alpha": 1.0})
         self.autoaddartists = True
 
@@ -141,6 +142,8 @@ class Main(Animation):
             columnspan=2
             )
         self.canvas.get_tk_widget().bind("<B1-Motion>",
+                                         self.update_function_by_mouse)
+        self.canvas.get_tk_widget().bind("<Button-1>",
                                          self.update_function_by_mouse)
 
         # All the other widgets
@@ -232,11 +235,10 @@ class Main(Animation):
         update_function_by_preset.
         """
         self.f = Functionx(str_args)
-        ones = ([1 for i in range(len(self.f.symbols) - 1)])
-        self.y = self.f(self.x, *ones)
-        self._update_appearance()
-        self.text.set_text("f(x) = $%s$" % (self.f.latex_repr))
         self.set_sliders()
+        self.slider_update()
+        self._update_appearance()
+        self.text.set_text("f(x) = $%s$" % self.f.latex_repr)
         # self.lim_update()
 
     def update_function_by_entry(self, *event: tk.Event) -> None:
@@ -280,6 +282,7 @@ class Main(Animation):
             self._update_appearance()
         elif in_bounds(event, pixel_ft_bounds, height):
             x, y = locate_mouse(event, bounds_ft, height, pixel_ft_bounds)
+            # y = -y if (int(x/(self.freq[1] - self.freq[0]))) % 2 else y
             change_array(self.freq, self.fourier_amps, x, y)
             change_array(self.freq, self.fourier_amps, -x, y)
             # change_array(self.freq, self.fourier_amps, x, y*np.exp(x*1.0j))
